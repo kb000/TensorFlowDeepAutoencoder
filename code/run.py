@@ -36,7 +36,8 @@ def main(argv=None):
   start()
 
   ae = autoencoder.main_unsupervised()
-  autoencoder.main_supervised(ae)
+  if not FLAGS.no_finetuning:
+    autoencoder.main_supervised(ae)
 
 if __name__ == '__main__':
   tf.app.run()

@@ -11,14 +11,14 @@ IMAGE_PIXELS = 28 * 28
 NUM_CLASSES = 10
 
 
-def home_out(path):
-  try:
-      return pjoin(os.environ['HOME'], 'tmp', 'mnist', path)
-  except KeyError:
-      return pjoin(os.environ['HOMEPATH'], 'tmp', 'mnist', path)
-
 flags = tf.app.flags
 FLAGS = flags.FLAGS
+
+def home_out(path):
+  try:
+      return pjoin(os.environ['HOME'], 'tmp', 'voy2', path)
+  except KeyError:
+      return pjoin(os.environ['HOMEPATH'], 'tmp', 'voy2', path)
 
 # Autoencoder Architecture Specific Flags
 flags.DEFINE_integer("num_hidden_layers", 3, "Number of hidden layers")
@@ -33,23 +33,33 @@ flags.DEFINE_integer('hidden3_units', 2000,
 flags.DEFINE_integer('image_pixels', IMAGE_PIXELS, 'Total number of pixels')
 flags.DEFINE_integer('num_classes', 10, 'Number of classes')
 
-flags.DEFINE_float('pre_layer1_learning_rate', 0.0001,
+flags.DEFINE_float('pre_layer1_learning_rate', 0.001,
                    'Initial learning rate.')
-flags.DEFINE_float('pre_layer2_learning_rate', 0.0001,
+flags.DEFINE_float('pre_layer2_learning_rate', 0.0005,
                    'Initial learning rate.')
-flags.DEFINE_float('pre_layer3_learning_rate', 0.0001,
+flags.DEFINE_float('pre_layer3_learning_rate', 0.0002,
                    'Initial learning rate.')
 
-flags.DEFINE_float('noise_1', 0.50, 'Rate at which to set pixels to 0')
-flags.DEFINE_float('noise_2', 0.50, 'Rate at which to set pixels to 0')
-flags.DEFINE_float('noise_3', 0.50, 'Rate at which to set pixels to 0')
+flags.DEFINE_boolean('use_gaussian_noise', False,
+                     'Whether to use gaussian noise instead of destructive noise.')
+
+flags.DEFINE_float('noise_1', 0.05, 'Noise rate.')
+flags.DEFINE_float('noise_2', 0.05, 'Noise rate.')
+flags.DEFINE_float('noise_3', 0.05, 'Noise rate.')
 
 # Data
 flags.DEFINE_boolean('use_tf_contrib_learn_datasets', False,
                      'Whether to use tf.contrib.learn.datasets for learning data')
 
-flags.DEFINE_integer('num_examples', None, 
+flags.DEFINE_string('filename_pattern', None,
+                    'Read data from a filename glob pattern')
+
+flags.DEFINE_integer('num_examples', None,
                      'Reduce the number of examples to this number')
+
+# Performance
+flags.DEFINE_boolean('no_finetuning', False,
+                     'Skip fine-tuning (supervised) training step')
 
 # Constants
 flags.DEFINE_integer('seed', 1234, 'Random seed')
@@ -76,6 +86,9 @@ flags.DEFINE_float('one_bound', 1.0 - 1.0e-9,
 flags.DEFINE_float('flush_secs', 120, 'Number of seconds to flush summaries')
 
 # Directories
+flags.DEFINE_string('log_dir_stem', 'tmp',
+                    'Directory stem to put the tensor data.')
+
 flags.DEFINE_string('data_dir', home_out('data'),
                     'Directory to put the training data.')
 

@@ -289,7 +289,8 @@ def main_unsupervised():
         data = read_data_sets_pretraining(train_dir=FLAGS.data_dir)
         num_train = data.train.num_examples
 
-        summary_interval = num_train // 50 // 100 * 100
+        summary_interval = max(1, num_train // 50 // 100) * 100
+        img_summary_interval = summary_interval * 100
 
         learning_rates = {j: getattr(FLAGS,
                                      "pre_layer{0}_learning_rate".format(j + 1))
@@ -344,6 +345,12 @@ def main_unsupervised():
                     if step % summary_interval == 0:
                         summary_str = sess.run(summary_op, feed_dict=feed_dict)
                         summary_writer.add_summary(summary_str, step)
+
+                        output = "| {0:>13} | {1:13.4f} | Layer {2} | Epoch {3}  |"\
+                                .format(step, loss_value, layer_num, step // num_train + 1)
+                        print(output)
+
+                    if step % img_summary_interval == 0:
                         image_summary_op = \
                             tf.summary.image("training_images",
                                              tf.reshape(input_,
@@ -356,9 +363,6 @@ def main_unsupervised():
                                                    feed_dict=feed_dict)
                         summary_writer.add_summary(summary_img_str)
 
-                        output = "| {0:>13} | {1:13.4f} | Layer {2} | Epoch {3}  |"\
-                                .format(step, loss_value, layer_num, step // num_train + 1)
-                        print(output)
             if i == 0:
                 filters = sess.run(tf.identity(ae["weights1"]))
                 np.save(pjoin(FLAGS.chkpt_dir, "filters"), filters)

@@ -5,13 +5,18 @@ from __future__ import print_function
 import gzip
 
 import os
+import glob
 import numpy
 import tensorflow
+
+from PIL import Image
 
 from six.moves import urllib
 from .flags import FLAGS
 
 SOURCE_URL = 'http://yann.lecun.com/exdb/mnist/'
+
+TEST_FRACTION = .2
 
 def maybe_download(filename, work_directory):
     """Download the data from Yann's website, unless it's already here."""
@@ -31,7 +36,7 @@ def _read32(bytestream):
 
 
 def extract_images(filename):
-    """Extract the images into a 4D uint8 numpy array [index, y, x, depth]."""
+    """Extract images from a gzip into a 4D uint8 numpy array [index, y, x, depth]."""
     print('\nExtracting', filename)
     with gzip.open(filename) as bytestream:
         magic = _read32(bytestream)
@@ -47,6 +52,26 @@ def extract_images(filename):
         data = numpy.frombuffer(buf, dtype=numpy.uint8)
         data = data.reshape(num_images, rows, cols, 1)
         return data
+
+def read_images(filename_glob):
+    """Read images from disk given a name pattern into a 4D uint8 numpy array [index, y, x, depth]."""
+    i = 0
+    image_filenames = glob.glob(filename_glob)
+    with Image.open(image_filenames[i]) as firstimg:
+        imgarr = numpy.array(firstimg)
+        data = numpy.zeros([len(image_filenames), *(imgarr.shape), 1], dtype=numpy.uint8)
+    for image_filename in image_filenames:
+        with Image.open(image_filename) as img:
+            imgarr = numpy.array(img)
+            # Flatten to one band/channel.
+            imgarr = imgarr.reshape(*(imgarr.shape),1)
+            if data.shape[1:] != imgarr.shape:
+                print('Image "{}" has the wrong shape. Expected: {}, Got: {}'
+                      .format(image_filename, data.shape[1:], imgarr.shape))
+            else:
+                data[i] = imgarr
+            i += 1
+    return data
 
 
 def dense_to_one_hot(labels_dense, num_classes=10):
@@ -203,27 +228,39 @@ def read_data_sets(train_dir, fake_data=False, one_hot=False):
         data_sets.validation = DataSet([], [], fake_data=True)
         data_sets.test = DataSet([], [], fake_data=True)
         return data_sets
-
+    
     if FLAGS.use_tf_contrib_learn_datasets:
         data_sets = tensorflow.contrib.learn.datasets.mnist.read_data_sets(train_dir=FLAGS.data_dir)
     else:
-        TRAIN_IMAGES = 'train-images-idx3-ubyte.gz'
-        TRAIN_LABELS = 'train-labels-idx1-ubyte.gz'
-        TEST_IMAGES = 't10k-images-idx3-ubyte.gz'
-        TEST_LABELS = 't10k-labels-idx1-ubyte.gz'
-        VALIDATION_SIZE = 5000
+        if FLAGS.filename_pattern:
+            all_images = read_images(FLAGS.filename_pattern)
+            indices = numpy.random.permutation(all_images.shape[0])
+            partition = int(all_images.shape[0] * (1-TEST_FRACTION))
+            training_idx, test_idx = indices[:partition], indices[partition:]
+            train_images = all_images[training_idx, :]
+            test_images = all_images[test_idx, :]
+            # These images are unlabeled.
+            train_labels = numpy.zeros(train_images.shape[0])
+            test_labels = numpy.zeros(train_images.shape[0])
+            VALIDATION_SIZE = 50
+        else:
+            TRAIN_IMAGES = 'train-images-idx3-ubyte.gz'
+            TRAIN_LABELS = 'train-labels-idx1-ubyte.gz'
+            TEST_IMAGES = 't10k-images-idx3-ubyte.gz'
+            TEST_LABELS = 't10k-labels-idx1-ubyte.gz'
+            VALIDATION_SIZE = 5000
 
-        local_file = maybe_download(TRAIN_IMAGES, train_dir)
-        train_images = extract_images(local_file)
+            local_file = maybe_download(TRAIN_IMAGES, train_dir)
+            train_images = extract_images(local_file)
 
-        local_file = maybe_download(TRAIN_LABELS, train_dir)
-        train_labels = extract_labels(local_file, one_hot=one_hot)
+            local_file = maybe_download(TRAIN_LABELS, train_dir)
+            train_labels = extract_labels(local_file, one_hot=one_hot)
 
-        local_file = maybe_download(TEST_IMAGES, train_dir)
-        test_images = extract_images(local_file)
+            local_file = maybe_download(TEST_IMAGES, train_dir)
+            test_images = extract_images(local_file)
 
-        local_file = maybe_download(TEST_LABELS, train_dir)
-        test_labels = extract_labels(local_file, one_hot=one_hot)
+            local_file = maybe_download(TEST_LABELS, train_dir)
+            test_labels = extract_labels(local_file, one_hot=one_hot)
 
         validation_images = train_images[:VALIDATION_SIZE]
         validation_labels = train_labels[:VALIDATION_SIZE]
@@ -252,15 +289,24 @@ def read_data_sets_pretraining(train_dir):
             pass
         data_sets = DataSets()
 
-        TRAIN_IMAGES = 'train-images-idx3-ubyte.gz'
-        TEST_IMAGES = 't10k-images-idx3-ubyte.gz'
-        VALIDATION_SIZE = 5000
+        if FLAGS.filename_pattern:
+            all_images = read_images(FLAGS.filename_pattern)
+            indices = numpy.random.permutation(all_images.shape[0])
+            partition = int(all_images.shape[0] * (1-TEST_FRACTION))
+            training_idx, test_idx = indices[:partition], indices[partition:]
+            train_images = all_images[training_idx, :]
+            test_images = all_images[test_idx, :]
+            VALIDATION_SIZE = 50
+        else:
+            TRAIN_IMAGES = 'train-images-idx3-ubyte.gz'
+            TEST_IMAGES = 't10k-images-idx3-ubyte.gz'
+            VALIDATION_SIZE = 5000
 
-        local_file = maybe_download(TRAIN_IMAGES, train_dir)
-        train_images = extract_images(local_file)
+            local_file = maybe_download(TRAIN_IMAGES, train_dir)
+            train_images = extract_images(local_file)
 
-        local_file = maybe_download(TEST_IMAGES, train_dir)
-        test_images = extract_images(local_file)
+            local_file = maybe_download(TEST_IMAGES, train_dir)
+            test_images = extract_images(local_file)
 
         validation_images = train_images[:VALIDATION_SIZE]
         train_images = train_images[VALIDATION_SIZE:]
@@ -279,9 +325,14 @@ def read_data_sets_pretraining(train_dir):
 
 def _add_noise(x, rate):
     x_cp = numpy.copy(x)
-    pix_to_drop = numpy.random.random_sample(x_cp.shape) < rate
-    x_cp[pix_to_drop] = FLAGS.zero_bound
-    return x_cp
+    if FLAGS.use_gaussian_noise:
+        x_cp += rate * numpy.random.normal(loc=0, scale=1, size=x_cp.shape)
+        x_cp = numpy.maximum(numpy.minimum(x_cp,numpy.ones(x_cp.shape)),numpy.zeros(x_cp.shape))
+        return x_cp
+    else:
+        pix_to_drop = numpy.random.random_sample(x_cp.shape) < rate
+        x_cp[pix_to_drop] = FLAGS.zero_bound
+        return x_cp
 
 
 def fill_feed_dict_ae(data_set, input_pl, target_pl, noise=None):
