@@ -1,8 +1,8 @@
 from __future__ import division
 from __future__ import print_function
 
-from flags import *
-from data import fill_feed_dict as fill_feed_dict
+from .flags import *
+from .data import fill_feed_dict as fill_feed_dict
 
 
 def loss_supervised(logits, labels):
@@ -22,11 +22,11 @@ def loss_supervised(logits, labels):
   batch_size = tf.size(labels)
   labels = tf.expand_dims(labels, 1)
   indices = tf.expand_dims(tf.range(0, batch_size), 1)
-  concated = tf.concat(1, [indices, labels])
+  concated = tf.concat(axis=1, values=[indices, labels])
   onehot_labels = tf.sparse_to_dense(
-      concated, tf.pack([batch_size, NUM_CLASSES]), 1.0, 0.0)
-  cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits,
-                                                          onehot_labels,
+      concated, tf.stack([batch_size, NUM_CLASSES]), 1.0, 0.0)
+  cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits,
+                                                          labels=onehot_labels,
                                                           name='xentropy')
   loss = tf.reduce_mean(cross_entropy, name='xentropy_mean')
   return loss
@@ -71,7 +71,7 @@ def do_eval(sess,
   true_count = 0  # Counts the number of correct predictions.
   steps_per_epoch = data_set.num_examples // FLAGS.batch_size
   num_examples = steps_per_epoch * FLAGS.batch_size
-  for step in xrange(steps_per_epoch):
+  for step in range(steps_per_epoch):
     feed_dict = fill_feed_dict(data_set,
                                images_placeholder,
                                labels_placeholder)
@@ -90,10 +90,10 @@ def do_eval_summary(tag,
   true_count = 0
   steps_per_epoch = data_set.num_examples // FLAGS.batch_size
   num_examples = steps_per_epoch * FLAGS.batch_size
-  for step in xrange(steps_per_epoch):
+  for step in range(steps_per_epoch):
     feed_dict = fill_feed_dict(data_set,
                                images_placeholder,
                                labels_placeholder)
     true_count += sess.run(eval_correct, feed_dict=feed_dict)
   error = 1 - true_count / num_examples
-  return sess.run(tf.scalar_summary(tag, tf.identity(error)))
+  return sess.run(tf.summary.scalar(tag, tf.identity(error)))

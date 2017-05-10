@@ -5,10 +5,11 @@ from __future__ import print_function
 import gzip
 
 import numpy
+import tensorflow
 
 from six.moves import urllib
 from six.moves import xrange  # pylint: disable=redefined-builtin
-from flags import FLAGS
+from .flags import FLAGS
 import os
 SOURCE_URL = 'http://yann.lecun.com/exdb/mnist/'
 
@@ -27,7 +28,7 @@ def maybe_download(filename, work_directory):
 
 def _read32(bytestream):
   dt = numpy.dtype(numpy.uint32).newbyteorder('>')
-  return numpy.frombuffer(bytestream.read(4), dtype=dt)
+  return int(numpy.frombuffer(bytestream.read(4), dtype=dt))
 
 
 def extract_images(filename):
@@ -42,7 +43,8 @@ def extract_images(filename):
     num_images = _read32(bytestream)
     rows = _read32(bytestream)
     cols = _read32(bytestream)
-    buf = bytestream.read(rows * cols * num_images)
+    byterange = rows * cols * num_images
+    buf = bytestream.read(byterange)
     data = numpy.frombuffer(buf, dtype=numpy.uint8)
     data = data.reshape(num_images, rows, cols, 1)
     return data
@@ -196,71 +198,88 @@ def read_data_sets(train_dir, fake_data=False, one_hot=False):
     data_sets.test = DataSet([], [], fake_data=True)
     return data_sets
 
-  TRAIN_IMAGES = 'train-images-idx3-ubyte.gz'
-  TRAIN_LABELS = 'train-labels-idx1-ubyte.gz'
-  TEST_IMAGES = 't10k-images-idx3-ubyte.gz'
-  TEST_LABELS = 't10k-labels-idx1-ubyte.gz'
-  VALIDATION_SIZE = 5000
+  if FLAGS.use_tf_contrib_learn_datasets:
+    data_sets = tensorflow.contrib.learn.datasets.mnist.read_data_sets(train_dir=FLAGS.data_dir)
+  else:
+    TRAIN_IMAGES = 'train-images-idx3-ubyte.gz'
+    TRAIN_LABELS = 'train-labels-idx1-ubyte.gz'
+    TEST_IMAGES = 't10k-images-idx3-ubyte.gz'
+    TEST_LABELS = 't10k-labels-idx1-ubyte.gz'
+    VALIDATION_SIZE = 5000
 
-  local_file = maybe_download(TRAIN_IMAGES, train_dir)
-  train_images = extract_images(local_file)
+    local_file = maybe_download(TRAIN_IMAGES, train_dir)
+    train_images = extract_images(local_file)
 
-  local_file = maybe_download(TRAIN_LABELS, train_dir)
-  train_labels = extract_labels(local_file, one_hot=one_hot)
+    local_file = maybe_download(TRAIN_LABELS, train_dir)
+    train_labels = extract_labels(local_file, one_hot=one_hot)
 
-  local_file = maybe_download(TEST_IMAGES, train_dir)
-  test_images = extract_images(local_file)
+    local_file = maybe_download(TEST_IMAGES, train_dir)
+    test_images = extract_images(local_file)
 
-  local_file = maybe_download(TEST_LABELS, train_dir)
-  test_labels = extract_labels(local_file, one_hot=one_hot)
+    local_file = maybe_download(TEST_LABELS, train_dir)
+    test_labels = extract_labels(local_file, one_hot=one_hot)
 
-  validation_images = train_images[:VALIDATION_SIZE]
-  validation_labels = train_labels[:VALIDATION_SIZE]
-  train_images = train_images[VALIDATION_SIZE:]
-  train_labels = train_labels[VALIDATION_SIZE:]
+    validation_images = train_images[:VALIDATION_SIZE]
+    validation_labels = train_labels[:VALIDATION_SIZE]
+    train_images = train_images[VALIDATION_SIZE:]
+    train_labels = train_labels[VALIDATION_SIZE:]
 
-  data_sets.train = DataSet(train_images, train_labels)
-  data_sets.validation = DataSet(validation_images, validation_labels)
-  data_sets.test = DataSet(test_images, test_labels)
+    data_sets.train = DataSet(train_images, train_labels)
+    data_sets.validation = DataSet(validation_images, validation_labels)
+    data_sets.test = DataSet(test_images, test_labels)
+
+  if FLAGS.num_examples != None:
+    data_sets.train._num_examples = FLAGS.num_examples
+    data_sets.validation._num_examples = FLAGS.num_examples
+    data_sets.test._num_examples = FLAGS.num_examples
 
   return data_sets
 
 
 def read_data_sets_pretraining(train_dir):
-  class DataSets(object):
-    pass
-  data_sets = DataSets()
+  if FLAGS.use_tf_contrib_learn_datasets:
+    data_sets = tensorflow.contrib.learn.datasets.mnist.read_data_sets(train_dir=FLAGS.data_dir)
+  else:
+    class DataSets(object):
+      pass
+    data_sets = DataSets()
 
-  TRAIN_IMAGES = 'train-images-idx3-ubyte.gz'
-  TEST_IMAGES = 't10k-images-idx3-ubyte.gz'
-  VALIDATION_SIZE = 5000
+    TRAIN_IMAGES = 'train-images-idx3-ubyte.gz'
+    TEST_IMAGES = 't10k-images-idx3-ubyte.gz'
+    VALIDATION_SIZE = 5000
 
-  local_file = maybe_download(TRAIN_IMAGES, train_dir)
-  train_images = extract_images(local_file)
+    local_file = maybe_download(TRAIN_IMAGES, train_dir)
+    train_images = extract_images(local_file)
 
-  local_file = maybe_download(TEST_IMAGES, train_dir)
-  test_images = extract_images(local_file)
+    local_file = maybe_download(TEST_IMAGES, train_dir)
+    test_images = extract_images(local_file)
 
-  validation_images = train_images[:VALIDATION_SIZE]
-  train_images = train_images[VALIDATION_SIZE:]
+    validation_images = train_images[:VALIDATION_SIZE]
+    train_images = train_images[VALIDATION_SIZE:]
 
-  data_sets.train = DataSetPreTraining(train_images)
-  data_sets.validation = DataSetPreTraining(validation_images)
-  data_sets.test = DataSetPreTraining(test_images)
+    data_sets.train = DataSetPreTraining(train_images)
+    data_sets.validation = DataSetPreTraining(validation_images)
+    data_sets.test = DataSetPreTraining(test_images)
+
+  if FLAGS.num_examples != None:
+    data_sets.train._num_examples = FLAGS.num_examples
+    data_sets.validation._num_examples = FLAGS.num_examples
+    data_sets.test._num_examples = FLAGS.num_examples
 
   return data_sets
 
 
 def _add_noise(x, rate):
   x_cp = numpy.copy(x)
-  pix_to_drop = numpy.random.rand(x_cp.shape[0],
-                                  x_cp.shape[1]) < rate
+  pix_to_drop = numpy.random.random_sample(x_cp.shape) < rate
   x_cp[pix_to_drop] = FLAGS.zero_bound
   return x_cp
 
 
 def fill_feed_dict_ae(data_set, input_pl, target_pl, noise=None):
     input_feed, target_feed = data_set.next_batch(FLAGS.batch_size)
+    if FLAGS.use_tf_contrib_learn_datasets:
+      target_feed = input_feed
     if noise:
       input_feed = _add_noise(input_feed, noise)
     feed_dict = {

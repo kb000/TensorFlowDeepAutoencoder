@@ -4,7 +4,7 @@ import subprocess
 
 from tensorflow import tensorboard as tb
 
-from flags import FLAGS, home_out
+from .flags import FLAGS, home_out
 
 
 _image_dir = FLAGS.data_dir
@@ -19,24 +19,30 @@ def start():
   if not os.path.exists(_tb_path):
     raise EnvironmentError("tensorboard.py not found!")
 
-  if os.path.exists(_tb_pid_file):
-    tb_pid = int(open(_tb_pid_file, 'r').readline().strip())
-    try:
-      os.kill(tb_pid, signal.SIGKILL)
-    except OSError:
-      pass
+  try:
+    if os.path.exists(_tb_pid_file):
+      tb_pid = int(open(_tb_pid_file, 'r').readline().strip())
+      try:
+        os.kill(tb_pid, signal.SIGKILL)
+      except OSError:
+        pass
 
-    os.remove(_tb_pid_file)
+      os.remove(_tb_pid_file)
 
-  devnull = open(os.devnull, 'wb')
-  p = subprocess.Popen(['nohup', FLAGS.python,
-                        '-u', _tb_path, '--logdir={0}'.format(_summary_dir),
-                        '--port=' + _tb_port], stdout=devnull, stderr=devnull)
-  with open(_tb_pid_file, 'w') as f:
-    f.write(str(p.pid))
+    devnull = open(os.devnull, 'wb')
+    p = subprocess.Popen(['nohup', FLAGS.python,
+                          '-u', _tb_path, '--logdir={0}'.format(_summary_dir),
+                          '--port=' + _tb_port], stdout=devnull, stderr=devnull)
+    with open(_tb_pid_file, 'w') as f:
+      f.write(str(p.pid))
 
-  if not FLAGS.no_browser:
-    subprocess.Popen(['open', 'http://localhost:{0}'.format(_tb_port)])
+    if not FLAGS.no_browser:
+      subprocess.Popen(['open', 'http://localhost:{0}'.format(_tb_port)])
+    
+  except FileNotFoundError:
+    # Probably Windows.
+    print ("Automatically launching tensorboard is not supported on Windows.")
+    print ("Lauch tensorboard with {} --logdir {} --port {}".format(_tb_path, _summary_dir, _tb_port))
 
 
 if __name__ == '__main__':

@@ -4,6 +4,7 @@ import shutil
 from ae.utils.flags import FLAGS, home_out
 import ae.autoencoder as autoencoder
 from ae.utils.start_tensorboard import start
+import tensorflow as tf
 
 
 _data_dir = FLAGS.data_dir
@@ -17,7 +18,7 @@ def _check_and_clean_dir(d):
   os.mkdir(d)
 
 
-def main():
+def main(argv=None):
   home = home_out('')
   if not os.path.exists(home):
     os.makedirs(home)
@@ -38,4 +39,4 @@ def main():
   autoencoder.main_supervised(ae)
 
 if __name__ == '__main__':
-    main()
+  tf.app.run()

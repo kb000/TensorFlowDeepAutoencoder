@@ -12,7 +12,10 @@ NUM_CLASSES = 10
 
 
 def home_out(path):
-  return pjoin(os.environ['HOME'], 'tmp', 'mnist', path)
+  try:
+      return pjoin(os.environ['HOME'], 'tmp', 'mnist', path)
+  except KeyError:
+      return pjoin(os.environ['HOMEPATH'], 'tmp', 'mnist', path)
 
 flags = tf.app.flags
 FLAGS = flags.FLAGS
@@ -40,6 +43,13 @@ flags.DEFINE_float('pre_layer3_learning_rate', 0.0001,
 flags.DEFINE_float('noise_1', 0.50, 'Rate at which to set pixels to 0')
 flags.DEFINE_float('noise_2', 0.50, 'Rate at which to set pixels to 0')
 flags.DEFINE_float('noise_3', 0.50, 'Rate at which to set pixels to 0')
+
+# Data
+flags.DEFINE_boolean('use_tf_contrib_learn_datasets', False,
+                     'Whether to use tf.contrib.learn.datasets for learning data')
+
+flags.DEFINE_integer('num_examples', None, 
+                     'Reduce the number of examples to this number')
 
 # Constants
 flags.DEFINE_integer('seed', 1234, 'Random seed')
