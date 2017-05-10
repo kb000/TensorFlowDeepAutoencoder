@@ -16,6 +16,8 @@ a deep autoencoder on the MNIST digit data set. For background and a similar imp
 
 The main training code can be found in [autoencoder.py](https://github.com/cmgreen210/TensorFlowDeepAutoencoder/blob/master/code/ae/autoencoder.py) along with the AutoEncoder class that creates and manages the Variables and Tensors used.
 
+New in May 2017, this repo is updated to work with TensorFlow r1.1.  It has also been upgraded to work with python3, and is verified to work on Windows.
+
 ## Docker Setup (CPU version only for the time being)
 In order to avoid platform issues it's highly encouraged that you run
 the example code in a [Docker](https://www.docker.com/) container. Follow
